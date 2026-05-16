@@ -5,6 +5,8 @@ import { ManagementClient } from 'auth0';
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
 
 app.use(express.json());
@@ -25,6 +27,17 @@ app.use(
     issuerBaseURL: process.env.ISSUER_BASE_URL || '',
     authorizationParams: {
       response_type: 'code',
+      scope: 'openid profile email',
+    },
+    transactionCookie: {
+      sameSite: 'None',
+      secure: true,
+    },
+    session: {
+      cookie: {
+        sameSite: 'None',
+        secure: true,
+      },
     },
   })
 );
