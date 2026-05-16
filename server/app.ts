@@ -30,16 +30,6 @@ app.use(
       response_type: 'code',
       scope: 'openid profile email',
     },
-    transactionCookie: {
-      sameSite: 'None',
-      secure: true,
-    },
-    session: {
-      cookie: {
-        sameSite: 'None',
-        secure: true,
-      },
-    },
   })
 );
 

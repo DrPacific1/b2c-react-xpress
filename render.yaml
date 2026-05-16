@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: b2c-orrcon-backend
+    runtime: node
+    region: oregon
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npx tsx index.ts
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: ISSUER_BASE_URL
+        sync: false
+      - key: CLIENT_ID
+        sync: false
+      - key: CLIENT_SECRET
+        sync: false
+      - key: BASE_URL
+        sync: false
+      - key: SECRET
+        sync: false
+      - key: CLIENT_URL
+        sync: false

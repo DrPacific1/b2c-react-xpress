@@ -2,9 +2,10 @@
   "buildCommand": "cd client && npm install && npm run build",
   "outputDirectory": "client/dist",
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api/index" },
-    { "source": "/login", "destination": "/api/index" },
-    { "source": "/logout", "destination": "/api/index" },
-    { "source": "/callback", "destination": "/api/index" }
+    { "source": "/api/:path*", "destination": "https://b2c-orrcon-backend.onrender.com/api/:path*" },
+    { "source": "/login", "destination": "https://b2c-orrcon-backend.onrender.com/login" },
+    { "source": "/logout", "destination": "https://b2c-orrcon-backend.onrender.com/logout" },
+    { "source": "/callback", "destination": "https://b2c-orrcon-backend.onrender.com/callback" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
