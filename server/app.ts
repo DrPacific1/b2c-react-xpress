@@ -22,7 +22,11 @@ app.use(
     secret: process.env.SECRET || 'dev-secret-replace-me',
     baseURL: process.env.BASE_URL || 'http://localhost:3000',
     clientID: process.env.CLIENT_ID || '',
+    clientSecret: process.env.CLIENT_SECRET || '',
     issuerBaseURL: process.env.ISSUER_BASE_URL || '',
+    authorizationParams: {
+      response_type: 'code',
+    },
   })
 );
 
