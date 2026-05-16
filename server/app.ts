@@ -19,17 +19,17 @@ app.use(
   auth({
     authRequired: false,
     auth0Logout: true,
-    secret: process.env.SECRET!,
+    secret: process.env.SECRET || 'dev-secret-replace-me',
     baseURL: process.env.BASE_URL || 'http://localhost:3000',
-    clientID: process.env.CLIENT_ID!,
-    issuerBaseURL: process.env.ISSUER_BASE_URL!,
+    clientID: process.env.CLIENT_ID || '',
+    issuerBaseURL: process.env.ISSUER_BASE_URL || '',
   })
 );
 
 const management = new ManagementClient({
-  domain: process.env.ISSUER_BASE_URL!.replace('https://', ''),
-  clientId: process.env.CLIENT_ID!,
-  clientSecret: process.env.CLIENT_SECRET!,
+  domain: (process.env.ISSUER_BASE_URL || '').replace('https://', ''),
+  clientId: process.env.CLIENT_ID || '',
+  clientSecret: process.env.CLIENT_SECRET || '',
 });
 
 app.get('/', (req, res) => {
