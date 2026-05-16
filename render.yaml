@@ -1,11 +1,10 @@
 services:
   - type: web
-    name: b2c-orrcon-backend
+    name: b2c-react-xpress
     runtime: node
     region: oregon
-    rootDir: server
-    buildCommand: npm install
-    startCommand: npx tsx index.ts
+    buildCommand: cd server && npm install
+    startCommand: cd server && npx tsx index.ts
     envVars:
       - key: NODE_ENV
         value: production
