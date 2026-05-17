@@ -31,6 +31,16 @@ app.use(
       scope: 'openid profile email',
       ...(process.env.AUTH0_AUDIENCE && { audience: process.env.AUTH0_AUDIENCE }),
     },
+    transactionCookie: {
+      sameSite: 'None',
+      secure: true,
+    },
+    session: {
+      cookie: {
+        sameSite: 'None',
+        secure: true,
+      },
+    },
   })
 );
 
