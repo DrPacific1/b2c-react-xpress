@@ -1,8 +1,17 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import { auth, requiresAuth } from 'express-openid-connect';
+import session from 'express-session';
+import cookieParser from 'cookie-parser';
 import { ManagementClient } from 'auth0';
+
+declare module 'express-session' {
+  interface SessionData {
+    user: any;
+    accessToken: string;
+    idToken: string;
+  }
+}
 
 const app = express();
 
@@ -13,36 +22,34 @@ const baseURL = process.env.BASE_URL || 'http://localhost:3000';
 const isSecure = baseURL.startsWith('https://');
 
 app.use(express.json());
+app.use(cookieParser());
 
 app.use(cors({
   origin: clientUrl,
   credentials: true,
 }));
 
-app.use(
-  auth({
-    authRequired: false,
-    auth0Logout: true,
-    secret: process.env.SECRET || 'dev-secret-replace-me',
-    baseURL,
-    clientID: process.env.CLIENT_ID || '',
-    clientSecret: process.env.CLIENT_SECRET || '',
-    issuerBaseURL: process.env.ISSUER_BASE_URL || '',
-    authorizationParams: {
-      response_type: 'code',
-      scope: 'openid profile email',
-      ...(process.env.ISSUER_BASE_URL && { audience: `${process.env.ISSUER_BASE_URL}/api/v2/` }),
-    },
-    transactionCookie: {
-      sameSite: isSecure ? 'None' : 'Lax',
-    },
-    session: {
-      cookie: {
-        sameSite: isSecure ? 'None' : 'Lax',
-      },
-    },
-  })
-);
+app.use(session({
+  secret: process.env.SECRET || 'dev-secret-replace-me',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: isSecure,
+    httpOnly: true,
+    sameSite: isSecure ? 'none' : 'lax',
+    maxAge: 24 * 60 * 60 * 1000,
+  },
+}));
+
+function requiresAuth(): express.RequestHandler {
+  return (req, res, next) => {
+    if (!req.session?.user) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+    next();
+  };
+}
 
 const management = new ManagementClient({
   domain: (process.env.ISSUER_BASE_URL || '').replace('https://', ''),
@@ -50,13 +57,122 @@ const management = new ManagementClient({
   clientSecret: process.env.CLIENT_SECRET || '',
 });
 
+// --- Auth routes ---
+
+app.get('/login', (req, res) => {
+  const params = new URLSearchParams({
+    client_id: process.env.CLIENT_ID || '',
+    response_type: 'code',
+    scope: 'openid profile email',
+    redirect_uri: `${baseURL}/callback`,
+    response_mode: 'query',
+    prompt: 'login',
+  });
+  if (process.env.AUTH0_AUDIENCE) {
+    params.set('audience', process.env.AUTH0_AUDIENCE);
+  }
+  if (req.query.screen_hint) {
+    params.set('screen_hint', req.query.screen_hint as string);
+  }
+  if (req.query.invitation) {
+    params.set('invitation', req.query.invitation as string);
+  }
+  if (req.query.organization) {
+    params.set('organization', req.query.organization as string);
+  }
+  res.redirect(`${process.env.ISSUER_BASE_URL}/authorize?${params.toString()}`);
+});
+
+app.get('/callback', async (req, res) => {
+  const code = req.query.code as string;
+  if (!code) {
+    res.status(400).json({ error: 'Missing authorization code' });
+    return;
+  }
+
+  try {
+    const tokenResponse = await fetch(`${process.env.ISSUER_BASE_URL}/oauth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: process.env.CLIENT_ID,
+        client_secret: process.env.CLIENT_SECRET,
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: `${baseURL}/callback`,
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const err = await tokenResponse.text();
+      console.error('[callback] token exchange failed:', err);
+      res.status(401).json({ error: 'Token exchange failed' });
+      return;
+    }
+
+    const tokens = await tokenResponse.json();
+    req.session.accessToken = tokens.access_token;
+    req.session.idToken = tokens.id_token;
+
+    const userInfoResponse = await fetch(`${process.env.ISSUER_BASE_URL}/userinfo`, {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+
+    if (userInfoResponse.ok) {
+      req.session.user = await userInfoResponse.json();
+    } else {
+      const payload = tokens.id_token?.split('.')[1];
+      if (payload) {
+        req.session.user = JSON.parse(Buffer.from(payload, 'base64url').toString());
+      }
+    }
+
+    res.redirect(`${clientUrl}/dashboard`);
+  } catch (err: any) {
+    console.error('[callback] error:', err.message);
+    res.status(500).json({ error: 'Authentication failed' });
+  }
+});
+
+app.get('/logout', (req, res) => {
+  req.session.destroy(() => {
+    const params = new URLSearchParams({
+      client_id: process.env.CLIENT_ID || '',
+      returnTo: clientUrl,
+    });
+    res.redirect(`${process.env.ISSUER_BASE_URL}/v2/logout?${params.toString()}`);
+  });
+});
+
 app.get('/', (req, res) => {
   res.redirect(`${clientUrl}/dashboard`);
 });
 
+// --- API routes ---
+
+app.get('/api/debug/config', (req, res) => {
+  res.json({
+    hasAudience: !!process.env.AUTH0_AUDIENCE,
+    audience: process.env.AUTH0_AUDIENCE,
+    baseURL: process.env.BASE_URL,
+    clientUrl: process.env.CLIENT_URL,
+  });
+});
+
+app.get('/api/status', (req, res) => {
+  res.json({ isAuthenticated: !!req.session?.user });
+});
+
+app.get('/api/auth/token', requiresAuth(), (req, res) => {
+  res.json({
+    accessToken: req.session.accessToken || null,
+    idToken: req.session.idToken || null,
+  });
+});
+
 app.get('/api/user', requiresAuth(), async (req, res) => {
   try {
-    const userId = req.oidc.user!.sub;
+    const userId = req.session.user.sub;
     const user = await management.users.get(userId);
     const meta = user.user_metadata || {};
     const normalized = {
@@ -68,17 +184,17 @@ app.get('/api/user', requiresAuth(), async (req, res) => {
       newsletter: meta.newsletter || false,
     };
     const { orgId, isAdmin } = await getOrgAdmin(req);
-    res.json({ ...req.oidc.user, user_metadata: normalized, org_id: orgId, isAdmin });
+    res.json({ ...req.session.user, user_metadata: normalized, org_id: orgId, isAdmin });
   } catch (err: any) {
     console.error('[GET /api/user]', err.statusCode, err.message);
-    res.json(req.oidc.user);
+    res.json(req.session.user);
   }
 });
 
 app.patch('/api/user/metadata', requiresAuth(), async (req, res) => {
   try {
     const { firstName, lastName, companyName, phone, newsletter, jobTitle } = req.body;
-    const userId = req.oidc.user!.sub;
+    const userId = req.session.user.sub;
     await management.users.update(userId, {
       user_metadata: { firstName, lastName, companyName, phone, newsletter, jobTitle },
     });
@@ -91,7 +207,7 @@ app.patch('/api/user/metadata', requiresAuth(), async (req, res) => {
 
 app.post('/api/user/reset-password', requiresAuth(), async (req, res) => {
   try {
-    const email = req.oidc.user!.email;
+    const email = req.session.user.email;
     const response = await fetch(`${process.env.ISSUER_BASE_URL}/dbconnections/change_password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -108,22 +224,11 @@ app.post('/api/user/reset-password', requiresAuth(), async (req, res) => {
   }
 });
 
-app.get('/api/status', (req, res) => {
-  res.json({ isAuthenticated: req.oidc.isAuthenticated() });
-});
-
-app.get('/api/auth/token', requiresAuth(), (req, res) => {
-  res.json({
-    idToken: (req.oidc as any).idToken || null,
-    accessToken: (req.oidc as any).accessToken || null,
-  });
-});
-
 async function getOrgAdmin(req: any): Promise<{ orgId: string | null; isAdmin: boolean }> {
-  const orgId = req.oidc.user?.org_id;
+  const orgId = req.session.user?.org_id;
   if (!orgId) return { orgId: null, isAdmin: false };
   try {
-    const userId = req.oidc.user!.sub;
+    const userId = req.session.user.sub;
     const members = await management.organizations.getMembers({ id: orgId });
     const member = (members.data || members).find((m: any) => m.user_id === userId);
     const roles = member?.roles || [];
@@ -135,7 +240,7 @@ async function getOrgAdmin(req: any): Promise<{ orgId: string | null; isAdmin: b
 }
 
 app.get('/api/org/me', requiresAuth(), async (req, res) => {
-  const orgId = req.oidc.user?.org_id;
+  const orgId = req.session.user?.org_id;
   if (!orgId) {
     res.json({ org_id: null, isAdmin: false });
     return;
@@ -187,7 +292,7 @@ app.post('/api/org/members/invite', requiresAuth(), async (req, res) => {
     const invitation: any = {
       id: orgId,
       body: {
-        inviter: { name: req.oidc.user!.name || 'Admin' },
+        inviter: { name: req.session.user.name || 'Admin' },
         invitee: { email },
         client_id: process.env.CLIENT_ID!,
         send_invitation_email: true,
