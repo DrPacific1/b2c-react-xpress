@@ -1169,3 +1169,370 @@ body {
   font-size: 1rem;
   margin-bottom: 1.5rem;
 }
+
+/* ========== DASHBOARD TABS ========== */
+
+.tab-nav {
+  display: flex;
+  gap: 0;
+  padding: 0 2rem;
+  background: var(--color-white);
+  border-bottom: 2px solid var(--color-border);
+}
+
+.tab-nav-btn {
+  padding: 0.9rem 1.5rem;
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-light);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.tab-nav-btn:hover {
+  color: var(--color-dark);
+}
+
+.tab-nav-btn.active {
+  color: var(--color-blue);
+  border-bottom-color: var(--color-blue);
+}
+
+/* ========== TAB PANEL (Debug, Admin, SSO) ========== */
+
+.tab-panel {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 0 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Debug Cards */
+.debug-card {
+  background: var(--color-white);
+  border-radius: 6px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.debug-card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-dark);
+  margin-bottom: 0.4rem;
+}
+
+.debug-card-desc {
+  font-size: 0.85rem;
+  color: var(--color-text-light);
+  margin-bottom: 1rem;
+}
+
+.debug-code-block {
+  position: relative;
+  background: #1e1e1e;
+  border-radius: 4px;
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+.debug-code-block pre {
+  color: #d4d4d4;
+  font-size: 0.8rem;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+
+.debug-copy-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #333;
+  color: #ccc;
+  border: 1px solid #555;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.debug-copy-btn:hover {
+  background: #444;
+  color: #fff;
+}
+
+.debug-copy-btn.copied {
+  background: #2e7d32;
+  color: #fff;
+  border-color: #2e7d32;
+}
+
+.debug-note {
+  font-size: 0.85rem;
+  color: var(--color-text-light);
+  font-style: italic;
+}
+
+/* ========== ADMIN CONSOLE STYLES ========== */
+
+.admin-alert {
+  padding: 0.8rem 1.2rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.admin-alert-error {
+  background: #fdecea;
+  color: #d32f2f;
+  border: 1px solid #f5c6cb;
+}
+
+.admin-alert-success {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
+}
+
+.admin-org-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.admin-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 0.2rem;
+}
+
+.admin-value {
+  font-size: 0.95rem;
+  color: var(--color-dark);
+}
+
+.admin-mono {
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 0.85rem;
+}
+
+/* Invite Form */
+.admin-invite-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.admin-invite-row {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.admin-input {
+  flex: 1;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.admin-input:focus {
+  border-color: var(--color-blue);
+}
+
+.admin-select {
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background: var(--color-white);
+  outline: none;
+  min-width: 140px;
+}
+
+.admin-select:focus {
+  border-color: var(--color-blue);
+}
+
+/* Admin Buttons */
+.admin-btn {
+  padding: 0.6rem 1.2rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.admin-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.admin-btn-primary {
+  background: var(--color-blue);
+  color: var(--color-white);
+}
+
+.admin-btn-primary:hover:not(:disabled) {
+  background: var(--color-blue-light);
+}
+
+.admin-btn-danger {
+  background: #d32f2f;
+  color: var(--color-white);
+}
+
+.admin-btn-danger:hover:not(:disabled) {
+  background: #b71c1c;
+}
+
+.admin-btn-sm {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+}
+
+/* Admin List */
+.admin-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.admin-list-item:last-child {
+  border-bottom: none;
+}
+
+.admin-list-item-info {
+  flex: 1;
+}
+
+.admin-list-item-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-dark);
+}
+
+.admin-list-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  color: var(--color-text-light);
+}
+
+.admin-list-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* Member Row */
+.admin-member-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.admin-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.admin-avatar-placeholder {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-blue);
+  color: var(--color-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+/* Roles */
+.admin-roles-row {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.admin-role-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  background: #e3f2fd;
+  color: #1565c0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 3px;
+}
+
+.admin-role-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+/* Badges */
+.admin-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 3px;
+}
+
+.admin-badge-pending {
+  background: #fff8e1;
+  color: #f57f17;
+}
+
+.admin-badge-active {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.admin-you-badge {
+  margin-left: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--color-text-light);
+}
+
+/* Loading */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  font-size: 1rem;
+  color: var(--color-text-light);
+}

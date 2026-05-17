@@ -56,7 +56,8 @@ app.get('/api/user', requiresAuth(), async (req, res) => {
       jobTitle: meta.jobTitle || meta.job_title || '',
       newsletter: meta.newsletter || false,
     };
-    res.json({ ...req.oidc.user, user_metadata: normalized });
+    const { orgId, isAdmin } = await getOrgAdmin(req);
+    res.json({ ...req.oidc.user, user_metadata: normalized, org_id: orgId, isAdmin });
   } catch (err: any) {
     console.error('[GET /api/user]', err.statusCode, err.message);
     res.json(req.oidc.user);
@@ -98,6 +99,216 @@ app.post('/api/user/reset-password', requiresAuth(), async (req, res) => {
 
 app.get('/api/status', (req, res) => {
   res.json({ isAuthenticated: req.oidc.isAuthenticated() });
+});
+
+app.get('/api/auth/token', requiresAuth(), (req, res) => {
+  res.json({
+    idToken: (req.oidc as any).idToken || null,
+    accessToken: (req.oidc as any).accessToken || null,
+  });
+});
+
+async function getOrgAdmin(req: any): Promise<{ orgId: string | null; isAdmin: boolean }> {
+  const orgId = req.oidc.user?.org_id;
+  if (!orgId) return { orgId: null, isAdmin: false };
+  try {
+    const userId = req.oidc.user!.sub;
+    const members = await management.organizations.getMembers({ id: orgId });
+    const member = (members.data || members).find((m: any) => m.user_id === userId);
+    const roles = member?.roles || [];
+    const isAdmin = roles.some((r: any) => r.name === 'admin' || r.name === 'org_admin');
+    return { orgId, isAdmin };
+  } catch {
+    return { orgId, isAdmin: false };
+  }
+}
+
+app.get('/api/org/me', requiresAuth(), async (req, res) => {
+  const orgId = req.oidc.user?.org_id;
+  if (!orgId) {
+    res.json({ org_id: null, isAdmin: false });
+    return;
+  }
+  try {
+    const org = await management.organizations.get({ id: orgId });
+    const { isAdmin } = await getOrgAdmin(req);
+    res.json({
+      org_id: orgId,
+      name: org.data.name,
+      display_name: org.data.display_name,
+      metadata: org.data.metadata,
+      isAdmin,
+    });
+  } catch (err: any) {
+    console.error('[GET /api/org/me]', err.message);
+    res.json({ org_id: orgId, isAdmin: false });
+  }
+});
+
+app.get('/api/org/members', requiresAuth(), async (req, res) => {
+  const { orgId, isAdmin } = await getOrgAdmin(req);
+  if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
+  try {
+    const members = await management.organizations.getMembers({ id: orgId });
+    const memberList = members.data || members;
+    const withRoles = await Promise.all(
+      (memberList as any[]).map(async (m: any) => {
+        try {
+          const roles = await management.organizations.getMemberRoles({ id: orgId, userId: m.user_id });
+          return { ...m, roles: roles.data || roles };
+        } catch {
+          return { ...m, roles: [] };
+        }
+      })
+    );
+    res.json(withRoles);
+  } catch (err: any) {
+    console.error('[GET /api/org/members]', err.message);
+    res.status(500).json({ error: 'Failed to fetch members' });
+  }
+});
+
+app.post('/api/org/members/invite', requiresAuth(), async (req, res) => {
+  const { orgId, isAdmin } = await getOrgAdmin(req);
+  if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
+  try {
+    const { email, role } = req.body;
+    const invitation: any = {
+      id: orgId,
+      body: {
+        inviter: { name: req.oidc.user!.name || 'Admin' },
+        invitee: { email },
+        client_id: process.env.CLIENT_ID!,
+        send_invitation_email: true,
+      },
+    };
+    if (role) {
+      const allRoles = await management.organizations.getRoles({ id: orgId });
+      const roleObj = (allRoles.data || allRoles).find((r: any) => r.name === role);
+      if (roleObj) invitation.body.roles = [roleObj.id];
+    }
+    await management.organizations.createInvitation(invitation);
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[POST /api/org/members/invite]', err.message);
+    res.status(500).json({ error: err.message || 'Failed to send invitation' });
+  }
+});
+
+app.get('/api/org/invitations', requiresAuth(), async (req, res) => {
+  const { orgId, isAdmin } = await getOrgAdmin(req);
+  if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
+  try {
+    const invitations = await management.organizations.getInvitations({ id: orgId });
+    res.json(invitations.data || invitations);
+  } catch (err: any) {
+    console.error('[GET /api/org/invitations]', err.message);
+    res.status(500).json({ error: 'Failed to fetch invitations' });
+  }
+});
+
+app.delete('/api/org/invitations/:invitationId', requiresAuth(), async (req, res) => {
+  const { orgId, isAdmin } = await getOrgAdmin(req);
+  if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
+  try {
+    await management.organizations.deleteInvitation({ id: orgId, invitation_id: req.params.invitationId });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[DELETE /api/org/invitations]', err.message);
+    res.status(500).json({ error: 'Failed to revoke invitation' });
+  }
+});
+
+app.delete('/api/org/members/:userId', requiresAuth(), async (req, res) => {
+  const { orgId, isAdmin } = await getOrgAdmin(req);
+  if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
+  try {
+    await management.organizations.deleteMembers({ id: orgId, members: [req.params.userId] });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[DELETE /api/org/members]', err.message);
+    res.status(500).json({ error: 'Failed to remove member' });
+  }
+});
+
+app.post('/api/org/members/:userId/roles', requiresAuth(), async (req, res) => {
+  const { orgId, isAdmin } = await getOrgAdmin(req);
+  if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
+  try {
+    await management.organizations.addMemberRoles({ id: orgId, userId: req.params.userId, body: { roles: req.body.roles } });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[POST /api/org/members/roles]', err.message);
+    res.status(500).json({ error: 'Failed to add role' });
+  }
+});
+
+app.delete('/api/org/members/:userId/roles', requiresAuth(), async (req, res) => {
+  const { orgId, isAdmin } = await getOrgAdmin(req);
+  if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
+  try {
+    await management.organizations.deleteMemberRoles({ id: orgId, userId: req.params.userId, body: { roles: req.body.roles } });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[DELETE /api/org/members/roles]', err.message);
+    res.status(500).json({ error: 'Failed to remove role' });
+  }
+});
+
+app.get('/api/org/roles', requiresAuth(), async (req, res) => {
+  const { orgId, isAdmin } = await getOrgAdmin(req);
+  if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
+  try {
+    const roles = await management.organizations.getRoles({ id: orgId });
+    res.json(roles.data || roles);
+  } catch (err: any) {
+    console.error('[GET /api/org/roles]', err.message);
+    res.status(500).json({ error: 'Failed to fetch roles' });
+  }
+});
+
+app.get('/api/org/sso/connections', requiresAuth(), async (req, res) => {
+  const { orgId, isAdmin } = await getOrgAdmin(req);
+  if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
+  try {
+    const connections = await management.organizations.getEnabledConnections({ id: orgId });
+    res.json(connections.data || connections);
+  } catch (err: any) {
+    console.error('[GET /api/org/sso/connections]', err.message);
+    res.status(500).json({ error: 'Failed to fetch SSO connections' });
+  }
+});
+
+app.post('/api/org/sso/ticket', requiresAuth(), async (req, res) => {
+  const { orgId, isAdmin } = await getOrgAdmin(req);
+  if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
+  try {
+    const { connection_id } = req.body;
+    const ticket = await management.selfServiceProfiles.createSsoTicket({
+      id: orgId,
+      body: {
+        connection_id: connection_id || undefined,
+        enabled_organizations: [{ organization_id: orgId }],
+        enabled_clients: [{ client_id: process.env.CLIENT_ID! }],
+      } as any,
+    });
+    res.json({ ticket: (ticket.data || ticket).ticket });
+  } catch (err: any) {
+    console.error('[POST /api/org/sso/ticket]', err.message);
+    res.status(500).json({ error: err.message || 'Failed to generate SSO ticket' });
+  }
+});
+
+app.delete('/api/org/sso/connections/:connectionId', requiresAuth(), async (req, res) => {
+  const { orgId, isAdmin } = await getOrgAdmin(req);
+  if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
+  try {
+    await management.organizations.deleteEnabledConnection({ id: orgId, connectionId: req.params.connectionId });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[DELETE /api/org/sso/connections]', err.message);
+    res.status(500).json({ error: 'Failed to remove SSO connection' });
+  }
 });
 
 export default app;
