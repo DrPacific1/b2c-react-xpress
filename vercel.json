@@ -6,6 +6,7 @@
     { "source": "/login", "destination": "https://b2c-react-xpress.onrender.com/login" },
     { "source": "/logout", "destination": "https://b2c-react-xpress.onrender.com/logout" },
     { "source": "/callback", "destination": "https://b2c-react-xpress.onrender.com/callback" },
+    { "source": "/step-up/:path*", "destination": "https://b2c-react-xpress.onrender.com/step-up/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

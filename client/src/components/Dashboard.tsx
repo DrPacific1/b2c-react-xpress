@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardNav from './DashboardNav';
 import ProductSidebar from './ProductSidebar';
 import ProductGrid from './ProductGrid';
@@ -17,6 +17,15 @@ const TABS = [
 export default function Dashboard() {
   const { user, isAdmin, orgInfo, loading } = useUser();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [resetToast, setResetToast] = useState('');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('passwordReset') === 'sent') {
+      setResetToast('Password reset email sent! Check your inbox.');
+      window.history.replaceState({}, '', '/dashboard');
+    }
+  }, []);
 
   const visibleTabs = TABS.filter(tab => !('adminOnly' in tab) || isAdmin);
 
@@ -45,6 +54,13 @@ export default function Dashboard() {
           </button>
         ))}
       </nav>
+
+      {resetToast && (
+        <div className="toast-banner">
+          <span>{resetToast}</span>
+          <button className="toast-dismiss" onClick={() => setResetToast('')}>&times;</button>
+        </div>
+      )}
 
       {activeTab === 'dashboard' && (
         <div className="dashboard-body">

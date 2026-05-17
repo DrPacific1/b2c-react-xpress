@@ -1202,6 +1202,30 @@ body {
   border-bottom-color: var(--color-blue);
 }
 
+/* ========== Toast Banner ========== */
+
+.toast-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 900px;
+  margin: 1rem auto 0;
+  padding: 0.75rem 1.25rem;
+  background: #d4edda;
+  color: #155724;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+.toast-dismiss {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  color: #155724;
+  cursor: pointer;
+  padding: 0 0.25rem;
+}
+
 /* ========== TAB PANEL (Debug, Admin, SSO) ========== */
 
 .tab-panel {

@@ -43,8 +43,6 @@ export default function AccountPage() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
 
-  const [resetSending, setResetSending] = useState(false);
-  const [resetMessage, setResetMessage] = useState('');
 
   const [selectedStore, setSelectedStore] = useState(stores[0]);
   const [enquiryMessage, setEnquiryMessage] = useState('');
@@ -90,18 +88,8 @@ export default function AccountPage() {
     }
   }
 
-  async function handleResetPassword() {
-    setResetSending(true);
-    setResetMessage('');
-    try {
-      const res = await fetch('/api/user/reset-password', { method: 'POST', credentials: 'include' });
-      if (res.ok) setResetMessage('Password reset email sent! Check your inbox.');
-      else throw new Error();
-    } catch {
-      setResetMessage('Failed to send reset email. Please try again.');
-    } finally {
-      setResetSending(false);
-    }
+  function handleResetPassword() {
+    window.location.href = '/step-up/reset-password';
   }
 
   function handleSendEnquiry(e: React.FormEvent) {
@@ -211,10 +199,9 @@ export default function AccountPage() {
                 <div className="account-password-section">
                   <h2 className="account-section-title">ACCOUNT PASSWORD</h2>
                   <p className="password-description">Click below to receive a secure password reset link via email.</p>
-                  <button type="button" className="btn btn-action" onClick={handleResetPassword} disabled={resetSending}>
-                    {resetSending ? 'Sending...' : 'RESET PASSWORD →'}
+                  <button type="button" className="btn btn-action" onClick={handleResetPassword}>
+                    RESET PASSWORD →
                   </button>
-                  {resetMessage && <p className={`form-message ${resetMessage.includes('Failed') ? 'error' : ''}`}>{resetMessage}</p>}
                 </div>
               </>
             )}

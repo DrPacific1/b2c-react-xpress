@@ -10,6 +10,7 @@ declare module 'express-session' {
     user: any;
     accessToken: string;
     idToken: string;
+    stepUpAction?: string;
   }
 }
 
@@ -127,11 +128,43 @@ app.get('/callback', async (req, res) => {
       }
     }
 
+    if (req.session.stepUpAction === 'reset-password') {
+      delete req.session.stepUpAction;
+      await fetch(`${process.env.ISSUER_BASE_URL}/dbconnections/change_password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: process.env.CLIENT_ID,
+          email: req.session.user.email,
+          connection: 'Username-Password-Authentication',
+        }),
+      });
+      res.redirect(`${clientUrl}/dashboard?passwordReset=sent`);
+      return;
+    }
+
     res.redirect(`${clientUrl}/dashboard`);
   } catch (err: any) {
     console.error('[callback] error:', err.message);
     res.status(500).json({ error: 'Authentication failed' });
   }
+});
+
+app.get('/step-up/reset-password', requiresAuth(), (req, res) => {
+  req.session.stepUpAction = 'reset-password';
+  const params = new URLSearchParams({
+    client_id: process.env.CLIENT_ID || '',
+    response_type: 'code',
+    scope: 'openid profile email',
+    redirect_uri: `${baseURL}/callback`,
+    response_mode: 'query',
+    prompt: 'login',
+    acr_values: 'http://schemas.openid.net/pape/policies/2007/06/multi-factor',
+  });
+  if (process.env.AUTH0_AUDIENCE) {
+    params.set('audience', process.env.AUTH0_AUDIENCE);
+  }
+  res.redirect(`${process.env.ISSUER_BASE_URL}/authorize?${params.toString()}`);
 });
 
 app.get('/logout', (req, res) => {

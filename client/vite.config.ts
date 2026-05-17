@@ -9,6 +9,7 @@ export default defineConfig({
       '/logout': 'http://localhost:3000',
       '/callback': 'http://localhost:3000',
       '/api': 'http://localhost:3000',
+      '/step-up': 'http://localhost:3000',
     },
   },
 })
