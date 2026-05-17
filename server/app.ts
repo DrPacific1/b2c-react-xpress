@@ -31,7 +31,7 @@ app.use(
     authorizationParams: {
       response_type: 'code',
       scope: 'openid profile email',
-      ...(process.env.AUTH0_AUDIENCE && { audience: process.env.AUTH0_AUDIENCE }),
+      ...(process.env.ISSUER_BASE_URL && { audience: `${process.env.ISSUER_BASE_URL}/api/v2/` }),
     },
     transactionCookie: {
       sameSite: isSecure ? 'None' : 'Lax',
