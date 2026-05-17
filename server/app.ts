@@ -9,6 +9,8 @@ const app = express();
 app.set('trust proxy', 1);
 
 const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+const baseURL = process.env.BASE_URL || 'http://localhost:3000';
+const isSecure = baseURL.startsWith('https://');
 
 app.use(express.json());
 
@@ -22,7 +24,7 @@ app.use(
     authRequired: false,
     auth0Logout: true,
     secret: process.env.SECRET || 'dev-secret-replace-me',
-    baseURL: process.env.BASE_URL || 'http://localhost:3000',
+    baseURL,
     clientID: process.env.CLIENT_ID || '',
     clientSecret: process.env.CLIENT_SECRET || '',
     issuerBaseURL: process.env.ISSUER_BASE_URL || '',
@@ -32,13 +34,11 @@ app.use(
       ...(process.env.AUTH0_AUDIENCE && { audience: process.env.AUTH0_AUDIENCE }),
     },
     transactionCookie: {
-      sameSite: 'None',
-      secure: true,
+      sameSite: isSecure ? 'None' : 'Lax',
     },
     session: {
       cookie: {
-        sameSite: 'None',
-        secure: true,
+        sameSite: isSecure ? 'None' : 'Lax',
       },
     },
   })
