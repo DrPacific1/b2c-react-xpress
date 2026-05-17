@@ -67,8 +67,10 @@ app.get('/login', (req, res) => {
     scope: 'openid profile email',
     redirect_uri: `${baseURL}/callback`,
     response_mode: 'query',
-    prompt: 'login',
   });
+  if (!req.query.invitation) {
+    params.set('prompt', 'login');
+  }
   if (process.env.AUTH0_AUDIENCE) {
     params.set('audience', process.env.AUTH0_AUDIENCE);
   }
@@ -85,6 +87,15 @@ app.get('/login', (req, res) => {
 });
 
 app.get('/callback', async (req, res) => {
+  if (req.query.error) {
+    console.error('[callback] Auth0 error:', req.query.error, req.query.error_description);
+    res.status(400).json({
+      error: req.query.error,
+      error_description: req.query.error_description || 'Authorization failed',
+    });
+    return;
+  }
+
   const code = req.query.code as string;
   if (!code) {
     res.status(400).json({ error: 'Missing authorization code' });
@@ -125,6 +136,16 @@ app.get('/callback', async (req, res) => {
       const payload = tokens.id_token?.split('.')[1];
       if (payload) {
         req.session.user = JSON.parse(Buffer.from(payload, 'base64url').toString());
+      }
+    }
+
+    if (tokens.id_token) {
+      const idPayload = tokens.id_token.split('.')[1];
+      if (idPayload) {
+        const claims = JSON.parse(Buffer.from(idPayload, 'base64url').toString());
+        if (claims.org_id && req.session.user) {
+          req.session.user.org_id = claims.org_id;
+        }
       }
     }
 
