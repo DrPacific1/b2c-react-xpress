@@ -1,4 +1,12 @@
+import { useAuth } from '../hooks/useAuth';
+import { Navigate } from 'react-router-dom';
+
 export default function LandingPage() {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) return <div className="loading">Loading...</div>;
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+
   return (
     <main className="landing">
       <section className="landing-hero">
