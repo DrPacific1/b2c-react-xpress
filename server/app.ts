@@ -29,6 +29,7 @@ app.use(
     authorizationParams: {
       response_type: 'code',
       scope: 'openid profile email',
+      audience: process.env.AUTH0_AUDIENCE || '',
     },
   })
 );
