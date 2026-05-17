@@ -285,7 +285,7 @@ async function getOrgAdmin(req: any): Promise<{ orgId: string | null; isAdmin: b
     const members = await management.organizations.getMembers({ id: orgId });
     const member = (members.data || members).find((m: any) => m.user_id === userId);
     const roles = member?.roles || [];
-    const isAdmin = roles.some((r: any) => r.name === 'admin' || r.name === 'org_admin');
+    const isAdmin = roles.some((r: any) => r.name === 'admin' || r.name === 'org_admin' || r.name === 'organisation_admin');
     return { orgId, isAdmin };
   } catch {
     return { orgId, isAdmin: false };
