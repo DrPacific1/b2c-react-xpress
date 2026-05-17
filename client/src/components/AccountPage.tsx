@@ -42,11 +42,20 @@ export default function AccountPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [resetToast, setResetToast] = useState('');
 
 
   const [selectedStore, setSelectedStore] = useState(stores[0]);
   const [enquiryMessage, setEnquiryMessage] = useState('');
   const [enquirySent, setEnquirySent] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('passwordReset') === 'sent') {
+      setResetToast('Password reset email sent! Check your inbox.');
+      window.history.replaceState({}, '', '/account');
+    }
+  }, []);
 
   useEffect(() => {
     fetch('/api/user', { credentials: 'include' })
@@ -124,6 +133,12 @@ export default function AccountPage() {
       <DashboardNav />
       <div className="account-page">
         <div className="account-card">
+          {resetToast && (
+            <div className="toast-banner">
+              <span>{resetToast}</span>
+              <button className="toast-dismiss" onClick={() => setResetToast('')}>&times;</button>
+            </div>
+          )}
           <div className="account-header">
             <h1 className="account-title">
               {activeTab === 'account' && 'MY ACCOUNT'}

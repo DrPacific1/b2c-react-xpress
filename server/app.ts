@@ -139,7 +139,7 @@ app.get('/callback', async (req, res) => {
           connection: 'Username-Password-Authentication',
         }),
       });
-      res.redirect(`${clientUrl}/dashboard?passwordReset=sent`);
+      res.redirect(`${clientUrl}/account?passwordReset=sent`);
       return;
     }
 
@@ -158,7 +158,6 @@ app.get('/step-up/reset-password', requiresAuth(), (req, res) => {
     scope: 'openid profile email',
     redirect_uri: `${baseURL}/callback`,
     response_mode: 'query',
-    prompt: 'login',
     acr_values: 'http://schemas.openid.net/pape/policies/2007/06/multi-factor',
   });
   if (process.env.AUTH0_AUDIENCE) {
