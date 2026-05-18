@@ -282,10 +282,9 @@ async function getOrgAdmin(req: any): Promise<{ orgId: string | null; isAdmin: b
   if (!orgId) return { orgId: null, isAdmin: false };
   try {
     const userId = req.session.user.sub;
-    const members = await management.organizations.getMembers({ id: orgId });
-    const member = (members.data || members).find((m: any) => m.user_id === userId);
-    const roles = member?.roles || [];
-    const isAdmin = roles.some((r: any) => r.name === 'admin' || r.name === 'org_admin' || r.name === 'organisation_admin');
+    const roles = await management.organizations.getMemberRoles({ id: orgId, userId });
+    const roleList = (roles as any).data || roles;
+    const isAdmin = roleList.some((r: any) => r.name === 'admin' || r.name === 'org_admin' || r.name === 'organisation_admin');
     return { orgId, isAdmin };
   } catch {
     return { orgId, isAdmin: false };
