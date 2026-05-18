@@ -277,6 +277,22 @@ app.post('/api/user/reset-password', requiresAuth(), async (req, res) => {
   }
 });
 
+async function getManagementToken(): Promise<string> {
+  const domain = (process.env.ISSUER_BASE_URL || '').replace('https://', '');
+  const res = await fetch(`https://${domain}/oauth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      grant_type: 'client_credentials',
+      client_id: process.env.CLIENT_ID,
+      client_secret: process.env.CLIENT_SECRET,
+      audience: `https://${domain}/api/v2/`,
+    }),
+  });
+  const data: any = await res.json();
+  return data.access_token;
+}
+
 async function getOrgAdmin(req: any): Promise<{ orgId: string | null; isAdmin: boolean }> {
   const orgId = req.session.user?.org_id;
   if (!orgId) return { orgId: null, isAdmin: false };
@@ -352,8 +368,9 @@ app.post('/api/org/members/invite', requiresAuth(), async (req, res) => {
       },
     };
     if (role) {
-      const allRoles = await management.organizations.getRoles({ id: orgId });
-      const roleObj = (allRoles.data || allRoles).find((r: any) => r.name === role);
+      const allRoles = await (management.roles as any).getAll();
+      const roleList = allRoles.data || allRoles;
+      const roleObj = (Array.isArray(roleList) ? roleList : []).find((r: any) => r.name === role);
       if (roleObj) invitation.body.roles = [roleObj.id];
     }
     await management.organizations.createInvitation(invitation);
@@ -428,8 +445,9 @@ app.get('/api/org/roles', requiresAuth(), async (req, res) => {
   const { orgId, isAdmin } = await getOrgAdmin(req);
   if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
   try {
-    const roles = await management.organizations.getRoles({ id: orgId });
-    res.json(roles.data || roles);
+    const roles = await (management.roles as any).getAll();
+    const roleList = roles.data || roles;
+    res.json(Array.isArray(roleList) ? roleList : []);
   } catch (err: any) {
     console.error('[GET /api/org/roles]', err.message);
     res.status(500).json({ error: 'Failed to fetch roles' });
@@ -451,17 +469,28 @@ app.get('/api/org/sso/connections', requiresAuth(), async (req, res) => {
 app.post('/api/org/sso/ticket', requiresAuth(), async (req, res) => {
   const { orgId, isAdmin } = await getOrgAdmin(req);
   if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
+  const profileId = process.env.AUTH0_SS_PROFILE_ID;
+  if (!profileId) { res.status(500).json({ error: 'Self-service profile not configured' }); return; }
   try {
+    const token = await getManagementToken();
+    const domain = (process.env.ISSUER_BASE_URL || '').replace('https://', '');
     const { connection_id } = req.body;
-    const ticket = await management.selfServiceProfiles.createSsoTicket({
-      id: orgId,
-      body: {
-        connection_id: connection_id || undefined,
-        enabled_organizations: [{ organization_id: orgId }],
-        enabled_clients: [{ client_id: process.env.CLIENT_ID! }],
-      } as any,
-    });
-    res.json({ ticket: (ticket.data || ticket).ticket });
+    const ticketBody: any = {
+      enabled_organizations: [{ organization_id: orgId, assign_membership_on_login: true }],
+      enabled_clients: [process.env.CLIENT_ID],
+    };
+    if (connection_id) {
+      ticketBody.connection_id = connection_id;
+    } else {
+      ticketBody.connection_config = { name: `${orgId.replace('org_', '')}-sso` };
+    }
+    const ticketRes = await fetch(
+      `https://${domain}/api/v2/self-service-profiles/${profileId}/sso-ticket`,
+      { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(ticketBody) }
+    );
+    const ticketData: any = await ticketRes.json();
+    if (!ticketRes.ok) throw new Error(ticketData.message || 'Failed to create ticket');
+    res.json({ ticket: ticketData.ticket });
   } catch (err: any) {
     console.error('[POST /api/org/sso/ticket]', err.message);
     res.status(500).json({ error: err.message || 'Failed to generate SSO ticket' });
