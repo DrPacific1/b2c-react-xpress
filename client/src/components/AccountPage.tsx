@@ -43,6 +43,7 @@ export default function AccountPage() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [resetToast, setResetToast] = useState('');
+  const [stepUpEnabled, setStepUpEnabled] = useState(true);
 
 
   const [selectedStore, setSelectedStore] = useState(stores[0]);
@@ -98,7 +99,13 @@ export default function AccountPage() {
   }
 
   function handleResetPassword() {
-    window.location.href = '/step-up/reset-password';
+    if (stepUpEnabled) {
+      window.location.href = '/step-up/reset-password';
+    } else {
+      fetch('/api/user/reset-password', { method: 'POST', credentials: 'include' })
+        .then(res => { if (res.ok) setResetToast('Password reset email sent! Check your inbox.'); })
+        .catch(() => setResetToast('Failed to send reset email.'));
+    }
   }
 
   function handleSendEnquiry(e: React.FormEvent) {
@@ -214,6 +221,14 @@ export default function AccountPage() {
                 <div className="account-password-section">
                   <h2 className="account-section-title">ACCOUNT PASSWORD</h2>
                   <p className="password-description">Click below to receive a secure password reset link via email.</p>
+                  <label className="toggle-label">
+                    <input
+                      type="checkbox"
+                      checked={stepUpEnabled}
+                      onChange={(e) => setStepUpEnabled(e.target.checked)}
+                    />
+                    Require Step-Up MFA
+                  </label>
                   <button type="button" className="btn btn-action" onClick={handleResetPassword}>
                     RESET PASSWORD →
                   </button>
