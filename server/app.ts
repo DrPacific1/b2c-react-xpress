@@ -358,22 +358,32 @@ app.post('/api/org/members/invite', requiresAuth(), async (req, res) => {
   if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
   try {
     const { email, role } = req.body;
-    const invitation: any = {
-      id: orgId,
-      body: {
-        inviter: { name: req.session.user.name || 'Admin' },
-        invitee: { email },
-        client_id: process.env.CLIENT_ID!,
-        send_invitation_email: true,
-      },
+    const token = await getManagementToken();
+    const domain = (process.env.ISSUER_BASE_URL || '').replace('https://', '');
+    const inviteBody: any = {
+      inviter: { name: req.session.user.name || 'Admin' },
+      invitee: { email },
+      client_id: process.env.CLIENT_ID,
+      send_invitation_email: true,
     };
     if (role) {
-      const rolesPage = await (management.roles as any).list();
-      const roleList = rolesPage.data || rolesPage.roles || rolesPage;
-      const roleObj = (Array.isArray(roleList) ? roleList : []).find((r: any) => r.name === role);
-      if (roleObj) invitation.body.roles = [roleObj.id];
+      const rolesRes = await fetch(`https://${domain}/api/v2/roles`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data: any = rolesRes.ok ? await rolesRes.json() : [];
+      const roles = Array.isArray(data) ? data : (data.roles || []);
+      const roleObj = roles.find((r: any) => r.name === role);
+      if (roleObj) inviteBody.roles = [roleObj.id];
     }
-    await management.organizations.createInvitation(invitation);
+    const inviteRes = await fetch(`https://${domain}/api/v2/organizations/${orgId}/invitations`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(inviteBody),
+    });
+    if (!inviteRes.ok) {
+      const errData: any = await inviteRes.json();
+      throw new Error(errData.message || `HTTP ${inviteRes.status}`);
+    }
     res.json({ success: true });
   } catch (err: any) {
     console.error('[POST /api/org/members/invite]', err.message);
@@ -385,8 +395,14 @@ app.get('/api/org/invitations', requiresAuth(), async (req, res) => {
   const { orgId, isAdmin } = await getOrgAdmin(req);
   if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
   try {
-    const invitations = await management.organizations.getInvitations({ id: orgId });
-    res.json(invitations.data || invitations);
+    const token = await getManagementToken();
+    const domain = (process.env.ISSUER_BASE_URL || '').replace('https://', '');
+    const invRes = await fetch(`https://${domain}/api/v2/organizations/${orgId}/invitations`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!invRes.ok) throw new Error(`Auth0 returned ${invRes.status}`);
+    const data: any = await invRes.json();
+    res.json(Array.isArray(data) ? data : (data.invitations || []));
   } catch (err: any) {
     console.error('[GET /api/org/invitations]', err.message);
     res.status(500).json({ error: 'Failed to fetch invitations' });
@@ -397,7 +413,13 @@ app.delete('/api/org/invitations/:invitationId', requiresAuth(), async (req, res
   const { orgId, isAdmin } = await getOrgAdmin(req);
   if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
   try {
-    await management.organizations.deleteInvitation({ id: orgId, invitation_id: req.params.invitationId });
+    const token = await getManagementToken();
+    const domain = (process.env.ISSUER_BASE_URL || '').replace('https://', '');
+    const delRes = await fetch(`https://${domain}/api/v2/organizations/${orgId}/invitations/${req.params.invitationId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!delRes.ok) throw new Error(`Auth0 returned ${delRes.status}`);
     res.json({ success: true });
   } catch (err: any) {
     console.error('[DELETE /api/org/invitations]', err.message);
@@ -409,7 +431,14 @@ app.delete('/api/org/members/:userId', requiresAuth(), async (req, res) => {
   const { orgId, isAdmin } = await getOrgAdmin(req);
   if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
   try {
-    await management.organizations.deleteMembers({ id: orgId, members: [req.params.userId] });
+    const token = await getManagementToken();
+    const domain = (process.env.ISSUER_BASE_URL || '').replace('https://', '');
+    const delRes = await fetch(`https://${domain}/api/v2/organizations/${orgId}/members`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ members: [req.params.userId] }),
+    });
+    if (!delRes.ok) throw new Error(`Auth0 returned ${delRes.status}`);
     res.json({ success: true });
   } catch (err: any) {
     console.error('[DELETE /api/org/members]', err.message);
@@ -421,7 +450,14 @@ app.post('/api/org/members/:userId/roles', requiresAuth(), async (req, res) => {
   const { orgId, isAdmin } = await getOrgAdmin(req);
   if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
   try {
-    await management.organizations.addMemberRoles({ id: orgId, userId: req.params.userId, body: { roles: req.body.roles } });
+    const token = await getManagementToken();
+    const domain = (process.env.ISSUER_BASE_URL || '').replace('https://', '');
+    const addRes = await fetch(`https://${domain}/api/v2/organizations/${orgId}/members/${req.params.userId}/roles`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roles: req.body.roles }),
+    });
+    if (!addRes.ok) throw new Error(`Auth0 returned ${addRes.status}`);
     res.json({ success: true });
   } catch (err: any) {
     console.error('[POST /api/org/members/roles]', err.message);
@@ -433,7 +469,14 @@ app.delete('/api/org/members/:userId/roles', requiresAuth(), async (req, res) =>
   const { orgId, isAdmin } = await getOrgAdmin(req);
   if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
   try {
-    await management.organizations.deleteMemberRoles({ id: orgId, userId: req.params.userId, body: { roles: req.body.roles } });
+    const token = await getManagementToken();
+    const domain = (process.env.ISSUER_BASE_URL || '').replace('https://', '');
+    const delRes = await fetch(`https://${domain}/api/v2/organizations/${orgId}/members/${req.params.userId}/roles`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roles: req.body.roles }),
+    });
+    if (!delRes.ok) throw new Error(`Auth0 returned ${delRes.status}`);
     res.json({ success: true });
   } catch (err: any) {
     console.error('[DELETE /api/org/members/roles]', err.message);
@@ -441,16 +484,24 @@ app.delete('/api/org/members/:userId/roles', requiresAuth(), async (req, res) =>
   }
 });
 
-app.get('/api/org/roles', requiresAuth(), async (req, res) => {
-  const { orgId, isAdmin } = await getOrgAdmin(req);
-  if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
+app.get('/api/org/roles', requiresAuth(), async (_req, res) => {
   try {
-    const rolesPage = await (management.roles as any).list();
-    const roleList = rolesPage.data || rolesPage.roles || rolesPage;
-    res.json(Array.isArray(roleList) ? roleList : []);
+    const token = await getManagementToken();
+    const domain = (process.env.ISSUER_BASE_URL || '').replace('https://', '');
+    const rolesRes = await fetch(`https://${domain}/api/v2/roles`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!rolesRes.ok) {
+      const errBody = await rolesRes.text();
+      console.error('[GET /api/org/roles] Auth0 returned', rolesRes.status, errBody);
+      throw new Error(`Auth0 returned ${rolesRes.status}: ${errBody}`);
+    }
+    const data = await rolesRes.json();
+    const roles = Array.isArray(data) ? data : (data.roles || []);
+    res.json(roles);
   } catch (err: any) {
     console.error('[GET /api/org/roles]', err.message);
-    res.status(500).json({ error: 'Failed to fetch roles' });
+    res.status(500).json({ error: err.message || 'Failed to fetch roles' });
   }
 });
 
@@ -458,8 +509,14 @@ app.get('/api/org/sso/connections', requiresAuth(), async (req, res) => {
   const { orgId, isAdmin } = await getOrgAdmin(req);
   if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
   try {
-    const connections = await management.organizations.getEnabledConnections({ id: orgId });
-    res.json(connections.data || connections);
+    const token = await getManagementToken();
+    const domain = (process.env.ISSUER_BASE_URL || '').replace('https://', '');
+    const connRes = await fetch(`https://${domain}/api/v2/organizations/${orgId}/enabled_connections`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!connRes.ok) throw new Error(`Auth0 returned ${connRes.status}`);
+    const data: any = await connRes.json();
+    res.json(Array.isArray(data) ? data : (data.enabled_connections || []));
   } catch (err: any) {
     console.error('[GET /api/org/sso/connections]', err.message);
     res.status(500).json({ error: 'Failed to fetch SSO connections' });
@@ -501,7 +558,13 @@ app.delete('/api/org/sso/connections/:connectionId', requiresAuth(), async (req,
   const { orgId, isAdmin } = await getOrgAdmin(req);
   if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
   try {
-    await management.organizations.deleteEnabledConnection({ id: orgId, connectionId: req.params.connectionId });
+    const token = await getManagementToken();
+    const domain = (process.env.ISSUER_BASE_URL || '').replace('https://', '');
+    const delRes = await fetch(`https://${domain}/api/v2/organizations/${orgId}/enabled_connections/${req.params.connectionId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!delRes.ok) throw new Error(`Auth0 returned ${delRes.status}`);
     res.json({ success: true });
   } catch (err: any) {
     console.error('[DELETE /api/org/sso/connections]', err.message);
