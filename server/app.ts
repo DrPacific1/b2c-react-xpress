@@ -282,11 +282,12 @@ async function getOrgAdmin(req: any): Promise<{ orgId: string | null; isAdmin: b
   if (!orgId) return { orgId: null, isAdmin: false };
   try {
     const userId = req.session.user.sub;
-    const roles = await management.organizations.getMemberRoles({ id: orgId, userId });
-    const roleList = (roles as any).data || roles;
+    const rolesPage = await (management.organizations as any).members.roles.list(orgId, userId);
+    const roleList = rolesPage.data || [];
     const isAdmin = roleList.some((r: any) => r.name === 'admin' || r.name === 'org_admin' || r.name === 'organisation_admin');
     return { orgId, isAdmin };
-  } catch {
+  } catch (err: any) {
+    console.error('[getOrgAdmin] Error fetching roles:', err.message);
     return { orgId, isAdmin: false };
   }
 }
@@ -298,7 +299,7 @@ app.get('/api/org/me', requiresAuth(), async (req, res) => {
     return;
   }
   try {
-    const org = await management.organizations.get({ id: orgId });
+    const org = await (management.organizations as any).get(orgId);
     const { isAdmin } = await getOrgAdmin(req);
     res.json({
       org_id: orgId,
@@ -317,12 +318,12 @@ app.get('/api/org/members', requiresAuth(), async (req, res) => {
   const { orgId, isAdmin } = await getOrgAdmin(req);
   if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
   try {
-    const members = await management.organizations.getMembers({ id: orgId });
+    const members = await (management.organizations as any).members.list(orgId);
     const memberList = members.data || members;
     const withRoles = await Promise.all(
       (memberList as any[]).map(async (m: any) => {
         try {
-          const roles = await management.organizations.getMemberRoles({ id: orgId, userId: m.user_id });
+          const roles = await (management.organizations as any).members.roles.list(orgId, m.user_id);
           return { ...m, roles: roles.data || roles };
         } catch {
           return { ...m, roles: [] };
