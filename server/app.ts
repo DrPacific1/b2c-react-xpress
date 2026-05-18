@@ -397,12 +397,23 @@ app.get('/api/org/invitations', requiresAuth(), async (req, res) => {
   try {
     const token = await getManagementToken();
     const domain = (process.env.ISSUER_BASE_URL || '').replace('https://', '');
-    const invRes = await fetch(`https://${domain}/api/v2/organizations/${orgId}/invitations`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const [invRes, rolesRes] = await Promise.all([
+      fetch(`https://${domain}/api/v2/organizations/${orgId}/invitations`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      fetch(`https://${domain}/api/v2/roles`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+    ]);
     if (!invRes.ok) throw new Error(`Auth0 returned ${invRes.status}`);
     const data: any = await invRes.json();
-    res.json(Array.isArray(data) ? data : (data.invitations || []));
+    const allRoles: any[] = rolesRes.ok ? await rolesRes.json() : [];
+    const roleMap = new Map((Array.isArray(allRoles) ? allRoles : []).map((r: any) => [r.id, r]));
+    const invitations = (Array.isArray(data) ? data : (data.invitations || [])).map((inv: any) => ({
+      ...inv,
+      roles: (inv.roles || []).map((roleId: string) => roleMap.get(roleId) || { id: roleId, name: roleId }),
+    }));
+    res.json(invitations);
   } catch (err: any) {
     console.error('[GET /api/org/invitations]', err.message);
     res.status(500).json({ error: 'Failed to fetch invitations' });
