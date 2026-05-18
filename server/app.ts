@@ -368,8 +368,8 @@ app.post('/api/org/members/invite', requiresAuth(), async (req, res) => {
       },
     };
     if (role) {
-      const allRoles = await (management.roles as any).getAll();
-      const roleList = allRoles.data || allRoles;
+      const rolesPage = await (management.roles as any).list();
+      const roleList = rolesPage.data || rolesPage.roles || rolesPage;
       const roleObj = (Array.isArray(roleList) ? roleList : []).find((r: any) => r.name === role);
       if (roleObj) invitation.body.roles = [roleObj.id];
     }
@@ -445,8 +445,8 @@ app.get('/api/org/roles', requiresAuth(), async (req, res) => {
   const { orgId, isAdmin } = await getOrgAdmin(req);
   if (!orgId || !isAdmin) { res.status(403).json({ error: 'Forbidden' }); return; }
   try {
-    const roles = await (management.roles as any).getAll();
-    const roleList = roles.data || roles;
+    const rolesPage = await (management.roles as any).list();
+    const roleList = rolesPage.data || rolesPage.roles || rolesPage;
     res.json(Array.isArray(roleList) ? roleList : []);
   } catch (err: any) {
     console.error('[GET /api/org/roles]', err.message);
