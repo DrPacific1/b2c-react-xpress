@@ -298,19 +298,19 @@ app.get('/api/org/me', requiresAuth(), async (req, res) => {
     res.json({ org_id: null, isAdmin: false });
     return;
   }
+  const { isAdmin } = await getOrgAdmin(req);
   try {
     const org = await (management.organizations as any).get(orgId);
-    const { isAdmin } = await getOrgAdmin(req);
     res.json({
       org_id: orgId,
-      name: org.data.name,
-      display_name: org.data.display_name,
-      metadata: org.data.metadata,
+      name: org.name,
+      display_name: org.display_name,
+      metadata: org.metadata,
       isAdmin,
     });
   } catch (err: any) {
-    console.error('[GET /api/org/me]', err.message);
-    res.json({ org_id: orgId, isAdmin: false });
+    console.error('[GET /api/org/me] org fetch failed:', err.message);
+    res.json({ org_id: orgId, isAdmin });
   }
 });
 
